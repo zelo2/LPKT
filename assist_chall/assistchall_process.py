@@ -117,7 +117,7 @@ def data_split(raw_data, percent=None):
         stu_object = []
         student = stu_id[i]
         for j in range(len(raw_data)):
-            if (student - raw_data[j, 0]) == 0:
+            if student == raw_data[j, 0]:
                 stu_object.append(raw_data[j])
 
         # ['studentId', 'problemId', 'skill', 'startTime', 'endTime', 'timeTaken', 'correct']
