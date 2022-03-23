@@ -1,6 +1,6 @@
 # coding: utf-8
 # started on 2022/3/19 @zelo2
-# to be finished @zelo2
+# finished on 2022/3/23 @zelo2
 import numpy as np
 import pandas as pd
 import tqdm
@@ -28,7 +28,7 @@ https://docs.google.com/spreadsheets/d/1QVUStXiRerWbH1X0P11rJ5IsuU2Xutu60D1SjpmT
 def id_dic_construction(x):
     corresponding_dic = {}
     for dic_index in range(len(x)):
-        corresponding_dic[x[dic_index]] = dic_index
+        corresponding_dic[x[dic_index]] = dic_index + 1  # for zero padding
     return corresponding_dic
 
 
@@ -42,6 +42,29 @@ def skill_dic_construction(raw_skill):
         skill_dic[skill_list[skill_index]] = skill_index
 
     return skill_dic
+
+def zero_padding(raw_kt_object, threshold=100):
+    kt_object = []
+    for student in tqdm.tqdm(range(len(raw_kt_object))):
+        stu_object = raw_kt_object[student]
+
+        stu_object_dim = stu_object.shape[0]
+        stu_object_length = stu_object.shape[1]
+
+        while stu_object_length > threshold:   # cut long sequence
+            kt_object.append(stu_object[:, :threshold])
+            stu_object = np.copy(stu_object[:, threshold:])
+            stu_object_length -= threshold
+
+        if stu_object_length > 0:  # complement short sequence
+            complement_length = threshold - stu_object_length
+            if complement_length == 0:  # exactly equal to sequence length
+                kt_object.append(stu_object)
+            else:
+                stu_object = np.concatenate((np.zeros([stu_object_dim, complement_length]), stu_object), axis=1)
+                kt_object.append(stu_object)
+
+    return kt_object
 
 
 def data_process_4LPKT(raw_data):
@@ -85,9 +108,6 @@ def data_split(raw_data, percent=None):
     raw_data = raw_data.sort_values(by=['startTime'])
     raw_data = np.array(raw_data)
 
-    og_ans_time = raw_data[:, -3] - raw_data[:, -4]
-    print(np.unique(og_ans_time))
-    print(len(np.unique(np.around(og_ans_time))))
 
     raw_stu_id = raw_data[:, 0]
     raw_exercise_id = raw_data[:, 1]
@@ -106,13 +126,13 @@ def data_split(raw_data, percent=None):
     print("Skill Number:", skill_num)
 
     '''Initialization for q-matrix'''
-    q_matrix = np.zeros([exercise_num, skill_num])
+    q_matrix = np.zeros([exercise_num+1, skill_num])
     for i in range(len(raw_data)):
         q_matrix[int(raw_exercise_id[i]), int(raw_skill[i])] = 1
     q_matrix = torch.from_numpy(q_matrix)
 
-    logs_num = 0
-    kt_object = []
+
+    raw_kt_object = []
     for i in tqdm.tqdm(range(len(stu_id))):
         stu_object = []
         student = stu_id[i]
@@ -124,16 +144,8 @@ def data_split(raw_data, percent=None):
         stu_object = np.array(stu_object)
         # stu_object = stu_object.T
 
-        logs_num += len(stu_object)
-
         # Answer Time Process
-        answer_time = stu_object[:, 4] - stu_object[:, 3]
-        mark = np.where(answer_time > 9990)
-        if len(mark) > 1:
-            print(len(mark))
-            print(answer_time[mark])
-            print(answer_time)
-            print(mark)
+        answer_time = np.around(stu_object[:, -2])
 
         round_mark_1 = answer_time >= 0.5 * 1
         round_mark_2 = answer_time < 1 * 1
@@ -144,7 +156,6 @@ def data_split(raw_data, percent=None):
 
         # Interval Time Computation
         start_time = stu_object[:, 3]
-        end_time = stu_object[:, 4]
         interval_time = np.zeros(len(start_time))
         interval_time[1:] = start_time[1:] - start_time[:-1]
 
@@ -160,31 +171,43 @@ def data_split(raw_data, percent=None):
         LPKT_cell[3] = stu_object[:, -1]
         LPKT_cell = LPKT_cell.astype('int64')
 
-        kt_object.append(LPKT_cell)
-    print(np.max(kt_object[165][1]))
-    print(logs_num, len(raw_data))
+        raw_kt_object.append(LPKT_cell)
+
     '''Decode time parameters'''
     raw_answer_time = np.array([])
     raw_interval_time = np.array([])
-    for i in tqdm.tqdm(range(len(kt_object))):
-        raw_answer_time = np.concatenate((raw_answer_time, kt_object[i][1]))
-        raw_interval_time = np.concatenate((raw_interval_time, kt_object[i][2]))
+    for i in tqdm.tqdm(range(len(raw_kt_object))):
+        raw_answer_time = np.concatenate((raw_answer_time, raw_kt_object[i][1]))
+        raw_interval_time = np.concatenate((raw_interval_time, raw_kt_object[i][2]))
 
     raw_answer_time = np.unique(raw_answer_time)
-    print(np.max(raw_answer_time))
     raw_interval_time = np.unique(raw_interval_time)
     answer_time_num = len(raw_answer_time)
     interval_time_num = len(raw_interval_time)
-    print(answer_time_num)
+
 
     answer_time_dic = id_dic_construction(raw_answer_time)
     interval_time_dic = id_dic_construction(raw_interval_time)
-    print(answer_time_dic)
-    # print(interval_time_dic)
-    for i in tqdm.tqdm(range(len(kt_object))):
-        for j in range(len(kt_object[i][0])):
-            kt_object[i][1][j] = answer_time_dic[kt_object[i][1][j]]
-            kt_object[i][2][j] = interval_time_dic[kt_object[i][2][j]]
+
+
+    for i in tqdm.tqdm(range(len(raw_kt_object))):
+        for j in range(len(raw_kt_object[i][0])):
+            raw_kt_object[i][1][j] = answer_time_dic[raw_kt_object[i][1][j]]
+            raw_kt_object[i][2][j] = interval_time_dic[raw_kt_object[i][2][j]]
+
+    '''Zero Padding'''
+    kt_object = zero_padding(raw_kt_object, threshold=500)
+    kt_object = np.array(kt_object)
+
+    # raw_answer_time = np.array([])
+    # raw_interval_time = np.array([])
+    # for i in tqdm.tqdm(range(len(raw_kt_object))):
+    #     raw_answer_time = np.concatenate((raw_answer_time, raw_kt_object[i][1]))
+    #     raw_interval_time = np.concatenate((raw_interval_time, raw_kt_object[i][2]))
+    #
+    # raw_answer_time = np.unique(raw_answer_time)
+    # raw_interval_time = np.unique(raw_interval_time)
+
 
     if percent is not None:
         # End for
@@ -207,8 +230,8 @@ def data_split(raw_data, percent=None):
         return [stu_num, exercise_num, skill_num, answer_time_num, interval_time_num], [q_matrix, kt_object]
 
 
-if __name__ == '__main__':
-    # og_data = pd.read_csv("anonymized_full_release_competition_dataset.csv", encoding="utf-8", low_memory=True)
-    # LPKT_data = data_process_4LPKT(og_data)
-    LPKT_data = pd.read_csv("assist_chall_4LPKT.csv", encoding="utf-8", low_memory=True)
-    data_information, data_sum = data_split(LPKT_data)
+# if __name__ == '__main__':
+#     # og_data = pd.read_csv("anonymized_full_release_competition_dataset.csv", encoding="utf-8", low_memory=True)
+#     # LPKT_data = data_process_4LPKT(og_data)
+#     LPKT_data = pd.read_csv("assist_chall_4LPKT.csv", encoding="utf-8", low_memory=True)
+#     data_information, data_sum = data_split(LPKT_data)

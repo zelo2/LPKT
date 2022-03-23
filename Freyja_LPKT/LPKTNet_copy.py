@@ -1,11 +1,14 @@
 # coding: utf-8
 # started on 2021/12/22 @zelo2
-# finished on 2022/3/22 @zelo2
+# finished on 2022/3/23 @zelo2
 
 import torch
 from torch import nn
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+device = torch.device(('cuda:0') if torch.cuda.is_available() else 'cpu')
+
+
 class LPKTNet(nn.Module):
     def __init__(self, exercise_num, skill_num, stu_num, ans_time_num, interval_time_num, d_k, d_a, d_e, q_matrix):
         '''
@@ -39,35 +42,35 @@ class LPKTNet(nn.Module):
         self.dropout = nn.Dropout(0.2)  # follow the original paper
 
         '''Exercise Embedding'''
-        self.exercise_embed = nn.Embedding(self.exercise_num, self.d_e)
+        self.exercise_embed = nn.Embedding(self.exercise_num + 1, self.d_e)  # +1 for zero padding
 
 
         '''Time Embedding'''
-        self.ans_time_embed = nn.Embedding(self.ans_time_num, self.d_k)
-        self.interval_time_embed = nn.Embedding(self.interval_time_num, self.d_k)
+        self.ans_time_embed = nn.Embedding(self.ans_time_num + 1, self.d_k)  # +1 for zero padding
+        self.interval_time_embed = nn.Embedding(self.interval_time_num + 1, self.d_k)  # +1 for zero padding
 
 
         '''MLP Construction'''
         # Learning gain Embedding
         # 这里的Embedding的input没有加入试题所考察的知识点向量 存疑？
         self.learning_embed_layer = nn.Linear(self.d_e + self.d_k + self.d_a, self.d_k)  # input = exercise + answer time+ answer
-        torch.nn.init.xavier_normal(self.learning_embed_layer.weight)  # follow the original paper
+        torch.nn.init.xavier_normal_(self.learning_embed_layer.weight)  # follow the original paper
 
         # Learning Obtain Layer
         self.learning_layer = nn.Linear(self.d_k * 4, self.d_k)  # input = l(t-1) + interval time + l(t) + h(t-1)
-        torch.nn.init.xavier_normal(self.learning_layer.weight)
+        torch.nn.init.xavier_normal_(self.learning_layer.weight)
 
         # Learning Judge Layer
         self.learning_gate = nn.Linear(self.d_k * 4, self.d_k)  # input = l(t-1) + interval time + l(t) + h(t-1)
-        torch.nn.init.xavier_normal(self.learning_gate.weight)
+        torch.nn.init.xavier_normal_(self.learning_gate.weight)
 
         # Forgetting Layer
         self.forgetting_gate = nn.Linear(self.d_k * 3, self.d_k)  # input = h(t-1) + learning gain (t) + interval time
-        torch.nn.init.xavier_normal(self.forgetting_gate.weight)
+        torch.nn.init.xavier_normal_(self.forgetting_gate.weight)
 
         # Predicting Layer
         self.predicting_layer = nn.Linear(self.d_k * 2, self.d_k)  # input = exercise (t+1) + h (t)
-        torch.nn.init.xavier_normal(self.predicting_layer.weight)
+        torch.nn.init.xavier_normal_(self.predicting_layer.weight)
 
 
     def forward(self, exercise_id,  ans_time, interval_time, answer_value):
@@ -79,9 +82,11 @@ class LPKTNet(nn.Module):
         :return: Prediction
         E.g:
              exercise_id- 1, 2, 3, 4, 6
-             answer_value- 1, 1, 0, 0, 0, 0
              ans_time- 5, 10, 15, 5, 20
              interval_time- 1000, 20000, 5000, 400
+             answer_value- 1, 1, 0, 0, 0, 0
+
+        P.S.: For those parameters required by the "bmm" operation, they should be Double and the others should be float.
         '''
 
         batch_size, sequence_len = exercise_id.size(0), exercise_id.size(1)
@@ -95,8 +100,9 @@ class LPKTNet(nn.Module):
         ans_time = self.ans_time_embed(ans_time)  # batch_size * sequence * d_k
         interval_time = self.interval_time_embed(interval_time)  # batch_size * sequence * d_k
 
+
         '''Preprocess the answer'''
-        answer = answer_value.view(-1, 1)  # (batch_size * sequence) * 1
+        answer = answer_value.contiguous().view(-1, 1)  # (batch_size * sequence) * 1
         answer = answer.repeat(1, self.d_a)  # (batch_size * sequence) * d_a
         answer = answer.view(batch_size, -1, self.d_a)  # batch_size * sequence * d_a
 
@@ -107,9 +113,13 @@ class LPKTNet(nn.Module):
 
         '''Past parameters'''
         h_tilde_pre = None  # h_t-1
-        learning_pre = torch.zeros(batch_size, self.d_k).to(device)
+        learning_pre = torch.zeros(batch_size, self.d_k).float().to(device)
         h_pre = torch.nn.init.xavier_uniform_(torch.zeros(self.skill_num, self.d_k))  # [knowledge, d_k]
         h_pre = h_pre.repeat(batch_size, 1, 1).to(device)  # [batch_size, knowledge, d_k]
+        h_pre = h_pre.to(torch.float64)
+
+        '''Prediction Results'''
+        prediction = torch.zeros([batch_size, sequence_len]).to(device)
 
         '''Batch size train'''
         # 每个作答序列，我们都需要两两拿出来进行训练
@@ -126,41 +136,60 @@ class LPKTNet(nn.Module):
 
             temp_exercise_id = exercise_id[:, t]  # batch_size
             knowledge_vector = self.q_matrix[temp_exercise_id].view(batch_size, 1, -1)  # [batch_size, 1, knowledge]
+            knowledge_vector = knowledge_vector.to(torch.float64)
 
 
             '''bmm是两个三维张量相乘, 两个输入tensor维度是 (b×n×m)和 (b×m×p), 第一维b代表batch size，输出为(b×n×p)'''
             # [batch_size, 1, knowledge concept]x[batch_size, knowledge concept, dk)
             if h_tilde_pre is None:
-                h_tilde_pre = knowledge_vector.bmm(h).view(batch_size, -1)  # [batch_size, dk)
+                h_tilde_pre = knowledge_vector.bmm(h_pre).view(batch_size, -1)  # [batch_size, dk)
+
 
             '''learning module'''
             # [batch_size, d_k]+[batch_size, d_k]+[batch_size, d_k]+[batch_size, d_k]->[batch_size, d_k]
-            lg = self.learning_layer((torch.cat(learning_pre, interval_time[:, t+1], learning_vector, h_tilde_pre), 1))
-            lg = self.tanh(lg)
+            lg = self.learning_layer(torch.cat((learning_pre, interval_time[:, t + 1], learning_vector,
+                                                h_tilde_pre.float()), 1))
+            lg = self.tanh(lg)  # [batch_size, d_k]
 
-            learning_gate_weight = self.learning_gate((torch.cat(learning_pre, interval_time[:, t+1], learning_vector, h_tilde_pre), 1))
-            learning_gate_weight = self.sigmoid(learning_gate_weight)
 
-            LG = learning_gate_weight * ((lg + 1) / 2).view(batch_size, 1, -1)  # [batch_size, 1, d_k]
+            learning_gate_weight = self.learning_gate(torch.cat((learning_pre, interval_time[:, t+1],
+                                                                 learning_vector,
+                                                                 h_tilde_pre.float()), 1))
+            learning_gate_weight = self.sigmoid(learning_gate_weight)  # [batch_size, d_k]
+
+
+            LG = learning_gate_weight * ((lg + 1) / 2)  # [batch_size, 1, d_k]
+
             # [batch_size, knowledge, 1] [batch, 1, d_k]
-            LG_tilde = self.dropout(knowledge_vector.transpose(1, 2).bmm(LG))  # [batch_size, knowledge, d_k]
+            LG_tilde = self.dropout(knowledge_vector.transpose(1, 2).bmm(LG.view(batch_size, 1, -1).to(torch.float64)))  # [batch_size, knowledge, d_k]
 
             '''Forgetting module'''
-            forget_factor = self.forgetting_gate(torch.cat((h_pre, LG, interval_time[:, t+1]), 1))
-            forget_factor = self.sigmoid(forget_factor)
+            # h_pre:[batch_size, knowledge, d_k]
+            # LG:[batch_size, d_k] -> repeat operation -> [batch_size, knowledge, d_k]
+            # interval_time[:, t+1]: [batch_size, d_k] -> repeat operation -> [batch_size, knowledge, d_k]
+            forget_factor = self.forgetting_gate(torch.cat(
+                (
+                h_pre.float(),
+                LG.repeat(1, self.skill_num).view(batch_size, -1, self.d_k),
+                interval_time[:, t+1].repeat(1, self.skill_num).view(batch_size, -1, self.d_k)
+                 ), 2
+                )
+                )
+            forget_factor = self.sigmoid(forget_factor)  # [batch_size, knowledge, d_k]
 
             '''Unpdating knwoledge state'''
+            # h_pre [batch_size, skill, d_k]
             h = LG_tilde + forget_factor * h_pre
+            h = h.to(torch.float64)
 
             '''Predicting module'''
             h_tilde = knowledge_vector.bmm(h).view(batch_size, -1)  # [batch_size, dk)
-            prediction = self.sigmoid(self.predicting_layer((torch.cat(exercise[:, t+1])), 1))
+            prediction[:, t+1] = self.sigmoid(self.predicting_layer(torch.cat((exercise[:, t+1], h_tilde.float()), 1))).sum(1) / self.d_k
 
             '''Updating past parameters'''
             h_pre = h
             h_tilde_pre = h_tilde
             learning_pre = learning_vector
 
-        return prediction  # [batch_size, 1]
-
+        return prediction  # [batch_size, sequence_len]
 
