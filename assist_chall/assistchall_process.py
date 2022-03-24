@@ -195,6 +195,7 @@ def data_split(raw_data, percent=None):
             raw_kt_object[i][1][j] = answer_time_dic[raw_kt_object[i][1][j]]
             raw_kt_object[i][2][j] = interval_time_dic[raw_kt_object[i][2][j]]
 
+
     '''Zero Padding'''
     kt_object = zero_padding(raw_kt_object, threshold=500)
     kt_object = np.array(kt_object)

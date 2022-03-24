@@ -91,7 +91,7 @@ def train(dataset):
                 answer_value = input_data[:, 3].float()
 
                 pred = net(exercise_id, answer_time, interval_time, answer_value)
-                pred = pred[1:].to(device)
+                pred = pred[:, 1:].to(device)
 
                 '''Backward propagation'''
                 loss = loss_function(pred, labels)
@@ -107,7 +107,7 @@ def train(dataset):
             with torch.no_grad():
                 for _, (input_data, labels) in enumerate(vali_dataloader):
 
-                    labels = labels[-1].float().to(device)
+                    labels = labels[:, -1].float().to(device)
 
                     input_data = input_data.to(device)  # [batch_size, 4, sequence]
                     exercise_id = input_data[:, 0].long()  # [batch_size, sequence]
@@ -116,13 +116,14 @@ def train(dataset):
                     answer_value = input_data[:, 3].float()
 
                     pred = net(exercise_id, answer_time, interval_time, answer_value)
-                    pred = pred[-1].to(device)
+                    pred = pred[:, -1].to(device)
 
                     vali_pred.append(pred)
                     vali_labels.append(labels)
 
                 vali_pred = torch.cat(vali_pred).numpy().cpu()
                 vali_labels = torch.cat(vali_labels).numpy().cpu()
+
 
             '''AUC'''
             vali_auc = metrics.roc_auc_score(vali_labels, vali_pred)
@@ -135,9 +136,11 @@ def train(dataset):
             print("Validation of epoch (AUC, Acc)", epoch, ":", vali_auc, vali_acc)
 
         '''Test'''
+        test_pred = []
+        test_labels = []
         with torch.no_grad():
             for _, (input_data, labels) in enumerate(test_dataloader):
-                labels = labels[-1].float().to(device)
+                labels = labels[:, -1].float().to(device)
 
                 input_data = input_data.to(device)
                 exercise_id = input_data[:, 0].long()  # [batch_size, sequence]
@@ -146,7 +149,7 @@ def train(dataset):
                 answer_value = input_data[:, 3].float()
 
                 pred = net(exercise_id, answer_time, interval_time, answer_value)
-                pred = pred[-1].to(device)
+                pred = pred[:, -1].to(device)
 
                 test_pred.append(pred)
                 test_labels.append(labels)

@@ -136,7 +136,7 @@ class LPKTNet(nn.Module):
 
             temp_exercise_id = exercise_id[:, t]  # batch_size
             knowledge_vector = self.q_matrix[temp_exercise_id].view(batch_size, 1, -1)  # [batch_size, 1, knowledge]
-            knowledge_vector = knowledge_vector.to(torch.float64)
+            knowledge_vector = knowledge_vector.to(torch.float64).to(device)
 
 
             '''bmm是两个三维张量相乘, 两个输入tensor维度是 (b×n×m)和 (b×m×p), 第一维b代表batch size，输出为(b×n×p)'''
