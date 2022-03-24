@@ -75,7 +75,7 @@ def train(dataset):
         optimizer = optim.Adam(net.parameters(), lr=0.001, weight_decay=0.0001)
 
         '''Train and Validation'''
-        for epoch in range(0):
+        for epoch in range(50):
             running_loss = 0
             print('Epoch', epoch+1)
             '''Train'''
