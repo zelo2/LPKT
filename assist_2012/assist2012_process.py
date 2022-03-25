@@ -124,7 +124,6 @@ def data_clean(og_data, threshold_length=15):
     raw_stu_id = raw_data[:, 0]
     stu_id = np.unique(raw_stu_id)
 
-    delete_stu = []
     for i in tqdm.tqdm(range(len(stu_id))):
         stu_object = []
         student = stu_id[i]
@@ -133,7 +132,6 @@ def data_clean(og_data, threshold_length=15):
                 stu_object.append(raw_data[j])
 
         if len(stu_object) < threshold_length:
-            delete_stu.append(student)
             delete_stu = np.where(raw_data[:, 0] == student)[0]
             raw_data = np.delete(raw_data, delete_stu, axis=0)  # delete length less than 15
 
