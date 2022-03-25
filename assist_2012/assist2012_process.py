@@ -10,14 +10,12 @@ import torch
 '''
 ASSIST 2012 Dataset:
 
-studentId：学生id  
+student_id：学生id  
 skill：知识点名称
-problemId：问题id
-startTime：答题时间
-endTime：答题结束时间
-timeTaken：Answer Time （Seconds）
+problem_id：问题id
+start_time：答题时间
+end_time：答题结束时间
 correct：Response to a problem（0 or 1）
-AveCorrect：平均分
 
 
 PS: For more detailed information about this dataset, please refer to 
@@ -66,32 +64,107 @@ def zero_padding(raw_kt_object, threshold=100):
 
     return kt_object
 
+def time_transform(time_string):
+    '''
+    :param time_string: e.g. "2012-10-09 11:01:52"
+    :return: np.array-[year, month, day, hour, minute, second]
+    warning: time_string must be "list" type
+    '''
+    result = []
+    for i in range(len(time_string)):
+        time_1 = time_string[i].split('-')  # [year, month, day+time]
+        time_2 = time_1[-1].split(' ')  # [day, hour+minute+seconds]
+        time_3 = time_2[-1].split(':')  # [hour, minute, seconds]
 
-def data_process_4LPKT(raw_data):
+        result.append([time_1[0], time_1[1], time_2[0], time_3[0], time_3[1], time_3[2]])
 
-    temp_data = raw_data[['user_id', 'problem_id', 'skill_id', 'correct']]
+    return np.array(result).astype('float')
+
+
+def time_computation(time_start, time_end):
+    '''
+    :param time_a: start_time
+    :param time_b: end_time
+    :return: interval/answer time(second)
+    '''
+    time_start = time_transform(time_start)
+    time_end = time_transform(time_end)
+    result = time_end - time_start
+
+    minute = 60  # 60 seconds
+    hour = minute * 60
+    day = hour * 24
+    month = day * 31
+    year = day * 365
+
+    time_table = np.array([year, month, day, hour, minute, 1])  # 1 stands for second
+    result *= time_table
+    result = np.sum(result, axis=1)  # sum each row
+    result[result > month] = month
+
+    return result
+
+
+def data_clean(og_data, threshold_length=15):
+
+    temp_data = og_data[['user_id', 'problem_id', 'skill_id', 'correct']]
     temp_data = temp_data.drop_duplicates()
 
-    raw_data = raw_data[['user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'correct']]
+    raw_data = og_data[['user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'correct']]
     raw_data = raw_data.drop_duplicates()
 
-
-
-    raw_data = np.array(raw_data)  # [stu_id, item_id, skill, start_time, end_time, answer_time, answer]
+    raw_data = np.array(raw_data)  # [stu_id, item_id, skill, start_time, end_time,  answer]
     temp_data = np.array(temp_data)
 
     delete_index = np.where((np.isnan(temp_data) * 1) == 1)[0]
     delete_index = np.unique(delete_index)
 
-    raw_data = np.delete(raw_data, delete_index, axis=0)
+    raw_data = np.delete(raw_data, delete_index, axis=0)  # delete NaN
+
+    raw_stu_id = raw_data[:, 0]
+    stu_id = np.unique(raw_stu_id)
+
+    delete_stu = []
+    for i in tqdm.tqdm(range(len(stu_id))):
+        stu_object = []
+        student = stu_id[i]
+        for j in range(len(raw_data)):
+            if student == raw_data[j, 0]:
+                stu_object.append(raw_data[j])
+
+        if len(stu_object) < threshold_length:
+            delete_stu.append(student)
+            delete_stu = np.where(raw_data[:, 0] == student)[0]
+            raw_data = np.delete(raw_data, delete_stu, axis=0)  # delete length less than 15
+
+    return raw_data
+
+
+
+def data_process_4LPKT(raw_data):
+
+    raw_data = raw_data[['user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'correct']]
+    raw_data = raw_data.drop_duplicates()
+
+    raw_data = np.array(raw_data)  # [stu_id, item_id, skill, start_time, end_time, answer]
+
 
     raw_stu_id = raw_data[:, 0]
     raw_exercise_id = raw_data[:, 1]
     raw_skill = raw_data[:, 2]
 
 
+
     raw_stu_id = np.unique(raw_stu_id)
     raw_exercise_id = np.unique(raw_exercise_id)
+
+    # Information of Dataset
+    stu_num = len(raw_stu_id)
+    exercise_num = len(raw_exercise_id)
+
+    print("Student Number:", stu_num)
+    print("Exercise Number:", exercise_num)
+
 
     stu_dic = id_dic_construction(raw_stu_id)
     exercise_dic = id_dic_construction(raw_exercise_id)
@@ -108,6 +181,7 @@ def data_process_4LPKT(raw_data):
     return processed_data
 
 
+
 def data_split(raw_data, percent=None):
     '''
     :param raw_data: ['user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'correct']
@@ -115,7 +189,7 @@ def data_split(raw_data, percent=None):
     :return:
     '''
 
-    raw_data = raw_data.sort_values(by=['startTime'])
+    raw_data = raw_data.sort_values(by=['start_time'])
     raw_data = np.array(raw_data)
 
 
@@ -150,15 +224,16 @@ def data_split(raw_data, percent=None):
             if student == raw_data[j, 0]:
                 stu_object.append(raw_data[j])
 
-        # ['studentId', 'problemId', 'skill', 'startTime', 'endTime', 'timeTaken', 'correct']
+        # ['user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'correct']
         stu_object = np.array(stu_object)
         # stu_object = stu_object.T
-
+        if len(stu_object) == 1:
+            continue
         # Answer Time Process
-        answer_time = np.around(stu_object[:, -2])
+        answer_time = time_computation(time_start=stu_object[:, 3], time_end=stu_object[:, 4])
 
-        round_mark_1 = answer_time >= 0.5 * 1
-        round_mark_2 = answer_time < 1 * 1
+        round_mark_1 = (answer_time >= 0.5) * 1
+        round_mark_2 = (answer_time < 1) * 1
         round_mark = (round_mark_1 + round_mark_2) == 2
 
         answer_time[round_mark] = 1  # Python error: np.around(0.5) = 0
@@ -167,11 +242,12 @@ def data_split(raw_data, percent=None):
         # Interval Time Computation
         start_time = stu_object[:, 3]
         interval_time = np.zeros(len(start_time))
-        interval_time[1:] = start_time[1:] - start_time[:-1]
+        interval_time[1:] = time_computation(time_start=start_time[:-1], time_end=start_time[1:])
 
         interval_time /= 60
         one_month = 60 * 24 * 30
         interval_time[interval_time > one_month] = one_month  # set the interval time longer than one month as one month
+        print(interval_time)
 
         # problem_id, answer time, interval time, correct
         LPKT_cell = np.zeros([4, stu_object.shape[0]])
@@ -207,17 +283,9 @@ def data_split(raw_data, percent=None):
 
 
     '''Zero Padding'''
-    kt_object = zero_padding(raw_kt_object, threshold=500)
+    kt_object = zero_padding(raw_kt_object, threshold=100)
     kt_object = np.array(kt_object)
 
-    # raw_answer_time = np.array([])
-    # raw_interval_time = np.array([])
-    # for i in tqdm.tqdm(range(len(raw_kt_object))):
-    #     raw_answer_time = np.concatenate((raw_answer_time, raw_kt_object[i][1]))
-    #     raw_interval_time = np.concatenate((raw_interval_time, raw_kt_object[i][2]))
-    #
-    # raw_answer_time = np.unique(raw_answer_time)
-    # raw_interval_time = np.unique(raw_interval_time)
 
 
     if percent is not None:
@@ -243,6 +311,7 @@ def data_split(raw_data, percent=None):
 
 if __name__ == '__main__':
     og_data = pd.read_csv("2012-2013-data-with-predictions-4-final.csv", encoding="utf-8", low_memory=True)
-    LPKT_data = data_process_4LPKT(og_data)
+    clean_data = data_clean(og_data, threshold_length=15)
+    LPKT_data = data_process_4LPKT(clean_data)
     # LPKT_data = pd.read_csv("assist_2012_4LPKT.csv", encoding="utf-8", low_memory=True)
     # data_information, data_sum = data_split(LPKT_data)

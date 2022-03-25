@@ -19,6 +19,8 @@ import sklearn.metrics as metrics
 def train(dataset):
     if dataset == 'assist_chall':
         path = '../assist_chall/assist_chall_4LPKT.csv'
+    elif dataset == 'assist_2012':
+        path = '../assist_2012/assits_2012_4LPKT.csv'
 
     data_inf, data_sum = assistchall_process.data_split(pd.read_csv(path, encoding="utf-8", low_memory=True))
 
@@ -48,14 +50,14 @@ def train(dataset):
     test = []
 
     for train_plus_vali_index, test_index in kf.split(np.arange(len(raw_data))):
-        test.append(raw_data[test_index])
         for train_index, vali_index in kf_train_vali.split(train_plus_vali_index):
+            test.append(raw_data[test_index])
             train.append(raw_data[train_index])
             vali.append(raw_data[vali_index])
 
 
 
-    for fold in range(n_split):
+    for fold in range(len(train_index)):
 
         '''Dataset'''
         train_dataset = LPKT_dataloader.lpkt_dataset(train[fold])
@@ -173,5 +175,5 @@ def train(dataset):
     print("Final Results (AUC, Acc):", np.mean(np.array(auc)), np.mean(np.array(acc)))
 
 if __name__ == '__main__':
-    dataset = ['assist_chall', 'Ednet']
+    dataset = ['assist_chall', 'assist_2012', 'Ednet']
     train(dataset[0])
