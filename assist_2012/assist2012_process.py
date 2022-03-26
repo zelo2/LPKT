@@ -135,6 +135,9 @@ def data_clean(og_data, threshold_length=15):
             delete_stu = np.where(raw_data[:, 0] == student)[0]
             raw_data = np.delete(raw_data, delete_stu, axis=0)  # delete length less than 15
 
+    raw_data = pd.DataFrame(raw_data,
+                            columns=['user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'correct'])
+
     return raw_data
 
 
