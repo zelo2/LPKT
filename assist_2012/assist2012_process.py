@@ -1,6 +1,6 @@
 # coding: utf-8
 # started on 2022/3/24 @zelo2
-# finished on 2022/3/？ @zelo2
+# finished on 2022/3/27 @zelo2
 import numpy as np
 import pandas as pd
 import tqdm
@@ -248,7 +248,7 @@ def data_split(raw_data, percent=None):
         interval_time /= 60
         one_month = 60 * 24 * 30
         interval_time[interval_time > one_month] = one_month  # set the interval time longer than one month as one month
-        print(interval_time)
+
 
         # problem_id, answer time, interval time, correct
         LPKT_cell = np.zeros([4, stu_object.shape[0]])
@@ -310,9 +310,9 @@ def data_split(raw_data, percent=None):
         return [stu_num, exercise_num, skill_num, answer_time_num, interval_time_num], [q_matrix, kt_object]
 
 
-if __name__ == '__main__':
-    og_data = pd.read_csv("2012-2013-data-with-predictions-4-final.csv", encoding="utf-8", low_memory=True)
-    clean_data = data_clean(og_data, threshold_length=15)
-    LPKT_data = data_process_4LPKT(clean_data)
-    # LPKT_data = pd.read_csv("assist_2012_4LPKT.csv", encoding="utf-8", low_memory=True)
-    # data_information, data_sum = data_split(LPKT_data)
+# if __name__ == '__main__':
+#     og_data = pd.read_csv("2012-2013-data-with-predictions-4-final.csv", encoding="utf-8", low_memory=True)
+#     clean_data = data_clean(og_data, threshold_length=15)
+#     LPKT_data = data_process_4LPKT(clean_data)
+#     LPKT_data = pd.read_csv("assist_2012_4LPKT.csv", encoding="utf-8", low_memory=True)
+#     data_information, data_sum = data_split(LPKT_data)
