@@ -1,6 +1,6 @@
 # coding: utf-8
 # started on 2022/3/22 @zelo2
-# finished on 2022/?/? @zelo2
+# finished on 2022/3/30 @zelo2
 
 import torch
 import numpy as np
@@ -14,15 +14,18 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.optim as optim
 import sklearn.metrics as metrics
+from  assist_2012 import assist2012_process
 
 
 def train(dataset):
     if dataset == 'assist_chall':
         path = '../assist_chall/assist_chall_4LPKT.csv'
+        data_inf, data_sum = assistchall_process.data_split(pd.read_csv(path, encoding="utf-8", low_memory=True))
     elif dataset == 'assist_2012':
-        path = '../assist_2012/assits_2012_4LPKT.csv'
+        path = '../assist_2012/assist_2012_4LPKT.csv'
+        data_inf, data_sum = assist2012_process.data_split(pd.read_csv(path, encoding="utf-8", low_memory=True))
 
-    data_inf, data_sum = assistchall_process.data_split(pd.read_csv(path, encoding="utf-8", low_memory=True))
+
 
 
     '''Paramater Initialization'''
@@ -123,8 +126,8 @@ def train(dataset):
                     vali_pred.append(pred)
                     vali_labels.append(labels)
 
-                vali_pred = torch.cat(vali_pred).numpy().cpu()
-                vali_labels = torch.cat(vali_labels).numpy().cpu()
+                vali_pred = torch.cat(vali_pred).cpu().numpy()
+                vali_labels = torch.cat(vali_labels).cpu().numpy()
 
 
             '''AUC'''
@@ -156,8 +159,8 @@ def train(dataset):
                 test_pred.append(pred)
                 test_labels.append(labels)
 
-            test_pred = torch.cat(test_pred).numpy().cpu()
-            test_labels = torch.cat(test_labels).numpy().cpu()
+            test_pred = torch.cat(test_pred).cpu().numpy()
+            test_labels = torch.cat(test_labels).cpu().numpy()
 
             '''AUC'''
             test_auc = metrics.roc_auc_score(test_labels, test_pred)
@@ -176,4 +179,4 @@ def train(dataset):
 
 if __name__ == '__main__':
     dataset = ['assist_chall', 'assist_2012', 'Ednet']
-    train(dataset[0])
+    train(dataset[1])
