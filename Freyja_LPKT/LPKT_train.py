@@ -1,6 +1,6 @@
 # coding: utf-8
 # started on 2022/3/22 @zelo2
-# finished on 2022/3/30 @zelo2
+# finished on 2022/4/1 @zelo2
 
 import torch
 import numpy as np
@@ -14,7 +14,8 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.optim as optim
 import sklearn.metrics as metrics
-from  assist_2012 import assist2012_process
+from assist_2012 import assist2012_process
+from ednet import ednet_process
 
 
 def train(dataset):
@@ -24,9 +25,9 @@ def train(dataset):
     elif dataset == 'assist_2012':
         path = '../assist_2012/assist_2012_4LPKT.csv'
         data_inf, data_sum = assist2012_process.data_split(pd.read_csv(path, encoding="utf-8", low_memory=True))
-
-
-
+    elif dataset == 'Ednet_KT1':
+        path = '../ednet/ednet_kt1_4LPKT.csv'
+        data_inf, data_sum = ednet_process.data_split(pd.read_csv(path, encoding="utf-8", low_memory=True))
 
     '''Paramater Initialization'''
     stu_num = data_inf[0]
@@ -43,7 +44,6 @@ def train(dataset):
     acc = []
     auc = []
 
-
     '''5-fold cross validation'''
     n_split = 5
     kf = KFold(n_splits=n_split, shuffle=True)
@@ -57,8 +57,6 @@ def train(dataset):
             test.append(raw_data[test_index])
             train.append(raw_data[train_index])
             vali.append(raw_data[vali_index])
-
-
 
     for fold in range(len(train_index)):
 
@@ -82,10 +80,9 @@ def train(dataset):
         '''Train and Validation'''
         for epoch in range(50):
             running_loss = 0
-            print('Epoch', epoch+1)
+            print('Epoch', epoch + 1)
             '''Train'''
             for _, (input_data, labels) in enumerate(train_dataloader):
-
                 optimizer.zero_grad()
                 labels = labels.float().to(device)
 
@@ -111,7 +108,6 @@ def train(dataset):
             vali_labels = []
             with torch.no_grad():
                 for _, (input_data, labels) in enumerate(vali_dataloader):
-
                     labels = labels[:, -1].float().to(device)
 
                     input_data = input_data.to(device)  # [batch_size, 4, sequence]
@@ -128,7 +124,6 @@ def train(dataset):
 
                 vali_pred = torch.cat(vali_pred).cpu().numpy()
                 vali_labels = torch.cat(vali_labels).cpu().numpy()
-
 
             '''AUC'''
             vali_auc = metrics.roc_auc_score(vali_labels, vali_pred)
@@ -177,6 +172,7 @@ def train(dataset):
 
     print("Final Results (AUC, Acc):", np.mean(np.array(auc)), np.mean(np.array(acc)))
 
+
 if __name__ == '__main__':
-    dataset = ['assist_chall', 'assist_2012', 'Ednet']
-    train(dataset[1])
+    dataset = ['assist_chall', 'assist_2012', 'Ednet_KT1']
+    train(dataset[-1])
