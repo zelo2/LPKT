@@ -48,7 +48,7 @@ def zero_padding(raw_kt_object, threshold=100):
     return kt_object
 
 
-def ednet_kt1_clean(question_path, data_path, threshold=15):
+def ednet_kt1_clean(question_path, data_path, threshold=1):
     '''
     Process the data as
     an uniform data format-['user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'time_taken', 'correct']
@@ -151,6 +151,7 @@ def data_split(raw_data, percent=None):
 
 
     raw_data = np.array(raw_data)
+
 
 
     raw_stu_id = raw_data[:, 0]
@@ -286,9 +287,9 @@ def data_split(raw_data, percent=None):
         return [stu_num, exercise_num, skill_num, answer_time_num, interval_time_num], [q_matrix, kt_object]
 
 
-# if __name__ == '__main__':
-#     data_path = "E:\PycharmProject\ednet\EdNet\KT1"  # original path
-#     ques_path = "E:\PycharmProject\ednet\EdNet\EdNet-Contents\contents\questions.csv"
-#     ednet_kt1_clean(ques_path, data_path)
-    # data = pd.read_csv('../ednet/ednet_kt1_4LPKT.csv', encoding='utf-8', low_memory=True)
-    # data_split(data)
+if __name__ == '__main__':
+    data_path = "E:\PycharmProject\ednet\EdNet\KT1"  # original path
+    ques_path = "E:\PycharmProject\ednet\EdNet\EdNet-Contents\contents\questions.csv"
+    ednet_kt1_clean(ques_path, data_path)
+    data = pd.read_csv('../ednet/ednet_kt1_4LPKT.csv', encoding='utf-8', low_memory=True)
+    data_split(data)
