@@ -107,23 +107,40 @@ def time_computation(time_start, time_end):
 
 def data_clean(og_data, threshold_length=1):
 
-    temp_data = og_data[['user_id', 'problem_id', 'skill_id', 'correct']]
-    temp_data = temp_data.drop_duplicates()
 
-    raw_data = og_data[['user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'correct']]
+    raw_data = og_data[['user_id', 'problem_id', 'skill_id', 'start_time', 'end_time', 'correct']]
     raw_data = raw_data.drop_duplicates()
 
     raw_data = np.array(raw_data)  # [stu_id, item_id, skill, start_time, end_time,  answer]
-    temp_data = np.array(temp_data)
 
-    delete_index = np.where((np.isnan(temp_data) * 1) == 1)[0]
+
+    temp_skill = raw_data[:, 2]
+    delete_index = []
+    for i in range(len(temp_skill)):
+        if np.isnan(temp_skill[i]):
+            delete_index.append(i)
     # delete_index = np.unique(delete_index)  # ?
-    print(delete_index)
+    delete_index = np.array(delete_index)
+
+
 
     raw_data = np.delete(raw_data, delete_index, axis=0)  # delete NaN
 
+    temp_skill_id = np.unique(raw_data[:, 2])
+    skill_id = []
+    for i in temp_skill_id:
+        if not np.isnan(i):
+            skill_id.append(i)
+    skill_id = np.array(skill_id)
+    skill_dic = id_dic_construction(skill_id)
+    print("skill number:", len(skill_id))
+
     raw_stu_id = raw_data[:, 0]
     stu_id = np.unique(raw_stu_id)
+
+    for i in range(len(raw_data)):
+        raw_data[i, 2] = skill_dic[raw_data[i, 2]]
+
 
     for i in tqdm.tqdm(range(len(stu_id))):
         stu_object = []
@@ -170,12 +187,11 @@ def data_process_4LPKT(raw_data):
 
     stu_dic = id_dic_construction(raw_stu_id)
     exercise_dic = id_dic_construction(raw_exercise_id)
-    skill_dic = skill_dic_construction(raw_skill)
 
     for i in range(len(raw_data)):
         raw_data[i, 0] = stu_dic[raw_data[i, 0]]
         raw_data[i, 1] = exercise_dic[raw_data[i, 1]]
-        raw_data[i, 2] = skill_dic[raw_data[i, 2]]
+        
 
     processed_data = pd.DataFrame(raw_data,
                                   columns=['user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'correct'])
@@ -313,7 +329,7 @@ def data_split(raw_data, percent=None):
 
 if __name__ == '__main__':
     og_data = pd.read_csv("2012-2013-data-with-predictions-4-final.csv", encoding="utf-8", low_memory=True)
-    clean_data = data_clean(og_data, threshold_length=10)
+    clean_data = data_clean(og_data, threshold_length=1)
     LPKT_data = data_process_4LPKT(clean_data)
     LPKT_data = pd.read_csv("assist_2012_4LPKT.csv", encoding="utf-8", low_memory=True)
     data_information, data_sum = data_split(LPKT_data)
