@@ -105,7 +105,7 @@ def time_computation(time_start, time_end):
     return result
 
 
-def data_clean(og_data, threshold_length=15):
+def data_clean(og_data, threshold_length=1):
 
     temp_data = og_data[['user_id', 'problem_id', 'skill_id', 'correct']]
     temp_data = temp_data.drop_duplicates()
@@ -117,7 +117,8 @@ def data_clean(og_data, threshold_length=15):
     temp_data = np.array(temp_data)
 
     delete_index = np.where((np.isnan(temp_data) * 1) == 1)[0]
-    delete_index = np.unique(delete_index)
+    # delete_index = np.unique(delete_index)  # ?
+    print(delete_index)
 
     raw_data = np.delete(raw_data, delete_index, axis=0)  # delete NaN
 
@@ -310,9 +311,9 @@ def data_split(raw_data, percent=None):
         return [stu_num, exercise_num, skill_num, answer_time_num, interval_time_num], [q_matrix, kt_object]
 
 
-# if __name__ == '__main__':
-#     og_data = pd.read_csv("2012-2013-data-with-predictions-4-final.csv", encoding="utf-8", low_memory=True)
-#     clean_data = data_clean(og_data, threshold_length=15)
-#     LPKT_data = data_process_4LPKT(clean_data)
-#     LPKT_data = pd.read_csv("assist_2012_4LPKT.csv", encoding="utf-8", low_memory=True)
-#     data_information, data_sum = data_split(LPKT_data)
+if __name__ == '__main__':
+    og_data = pd.read_csv("2012-2013-data-with-predictions-4-final.csv", encoding="utf-8", low_memory=True)
+    clean_data = data_clean(og_data, threshold_length=10)
+    LPKT_data = data_process_4LPKT(clean_data)
+    LPKT_data = pd.read_csv("assist_2012_4LPKT.csv", encoding="utf-8", low_memory=True)
+    data_information, data_sum = data_split(LPKT_data)
