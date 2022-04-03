@@ -1,5 +1,5 @@
 # started on 2022/3/30
-# finished on 2022/4/1 @zelo2
+# finished on 2022/4/? @zelo2
 
 import os
 import pandas as pd
@@ -7,6 +7,7 @@ import numpy as np
 import tqdm
 import torch
 import random
+
 '''
 Ednet_KT1:
 timestamp: Unix timestamp in milliseconds
@@ -21,6 +22,13 @@ def id_dic_construction(x):
     corresponding_dic = {}
     for dic_index in range(len(x)):
         corresponding_dic[x[dic_index]] = dic_index + 1  # plus 1 for zero padding
+    return corresponding_dic
+
+
+def skill_dic_construction(x):
+    corresponding_dic = {}
+    for dic_index in range(len(x)):
+        corresponding_dic[x[dic_index]] = dic_index
     return corresponding_dic
 
 
@@ -63,108 +71,108 @@ def ednet_kt1_clean(question_path, data_path, threshold=1):
     delete_index = []
     delete_ques = []
     for i in range(len(ques_info)):
-        skill = np.array(ques_info[i, -2].split(';')).astype('int64')  # tags
-        if skill[0] == -1:
+        ques_skill = np.array(ques_info[i, -2].split(';')).astype('int64')  # tags
+        if ques_skill[0] == -1:
             delete_index.append(i)
-            delete_ques.append(ques_info[i, 0])
+            delete_ques.append(int(ques_info[i, 0][1:]))
 
     '''Construct "question" (exercise) and "skill" (knowledge concept) dictionaries'''
     ques_info = np.delete(ques_info, delete_index, axis=0)  # delete row
-    ques_dic = id_dic_construction(ques_info[:, 0])  # question dictionary
     skill = []
-    # ques_info_single_skill = []
     for i in range(len(ques_info)):
-        ques_info[i, 0] = ques_dic[ques_info[i, 0]]
+        ques_info[i, 0] = int(ques_info[i, 0][1:])
         skill += ques_info[i, -2].split(';')  # tags
-        # for kc in np.array(ques_info[i, -2].split(';')).astype('int64'):
-        #     ques_info_single_skill.append([ques_info[i, 0], kc, ques_info[i, 3]])
-    skill = np.unique(np.array(skill).astype('int64'))
-    skill_dic = id_dic_construction(skill)  # skill dictionary
 
-    # '''Decode skill'''
-    # for i in range(len(ques_info_single_skill)):
-    #     ques_info_single_skill[i][1] = skill_dic[ques_info_single_skill[i][1]]
-    # ques_info_single_skill = np.array(ques_info_single_skill)  # question contains multiple skills would be divided into multiple rows
+    print("Exercise Number:", len(np.unique(ques_info[:, 0])))
+
+    skill = np.unique(np.array(skill).astype('int64'))
+    skill_dic = skill_dic_construction(skill)  # skill dictionary
+    print(skill_dic)
+    print("Skill Number:", len(skill))
 
     '''Process student record'''
     kt_data = []
     stu_file_list = os.listdir(data_path)
+    stu_file_list = stu_file_list
     # ['timestamp', 'solving_id', 'question_id', 'user_answer', 'elapsed_time']
     stu_id = 0
-    for stu_file_name in tqdm.tqdm(stu_file_list):
-        stu_record = pd.read_csv(data_path + '\\' + stu_file_name, encoding="utf-8", low_memory=True)
-        stu_record = stu_record.drop_duplicates()
 
+    # ['timestamp', 'solving_id', 'question_id', 'user_answer', 'elapsed_time']
+    answer_dic = {'a': 1, 'b': 2, 'c': 3, 'd': 4}
+    for stu_file_name in tqdm.tqdm(stu_file_list):
+        stu_record = pd.read_csv(data_path + '\\' + stu_file_name, encoding="utf-8", low_memory=True).fillna(-2)
+        stu_record = stu_record.drop_duplicates()
         # numpy array
         stu_record = stu_record.values
 
         # filter student
         delete_index_2 = []
         for i in range(len(stu_record)):
-            if stu_record[i, 2] in delete_ques:
+            stu_record[i, 2] = int(stu_record[i, 2][1:])
+            if (stu_record[i, 2] in delete_ques) or (stu_record[i, 3] == -2):
                 delete_index_2.append(i)
         stu_record = np.delete(stu_record, delete_index_2, axis=0)  # row delete
 
         stu_length = stu_record.shape[0]
         if stu_length < threshold:
+            print(stu_id)
             continue
 
-        lpkt_cell = []  # [? * 6]('user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'time_taken', 'correct')
+        # [? * 7]('user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'time_taken', 'correct')
         for i in range(len(stu_record)):
+
             temp_lpkt_cell = []
-            ques_id = ques_dic[stu_record[i, 2]]
+            ques_id = stu_record[i, 2]
             skill_index = np.where(ques_info[:, 0] == ques_id)[0][0]
 
             skill = ques_info[skill_index, -2].split(';')
 
+            if stu_record[i, 3] == -2:
+                print(stu_record[i])
 
             if stu_record[i, 3] == ques_info[skill_index, 3]:
                 correct = 1
             else:
                 correct = 0
             for kc in np.array(skill).astype('int64'):
-                temp_lpkt_cell.append([stu_id, ques_id, skill_dic[kc],
-                                       stu_record[i, 0]/1000,
-                                       (stu_record[i, 0])/1000 + stu_record[i, -1] / 1000,
-                                       stu_record[i, -1]/1000,
+                temp_lpkt_cell.append([stu_id, ques_id, kc,
+                                       stu_record[i, 0] / 1000,
+                                       (stu_record[i, 0]) / 1000 + stu_record[i, -1] / 1000,
+                                       stu_record[i, -1] / 1000,
                                        correct])
 
         kt_data.append(torch.tensor(temp_lpkt_cell))
         stu_id += 1
     kt_data = torch.cat(kt_data).numpy()
     processed_data = pd.DataFrame(kt_data,
-                                  columns=['user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'time_taken', 'correct'])
+                                  columns=['user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'time_taken',
+                                           'correct'])
     processed_data.to_csv('ednet_kt1_4LPKT.csv', index=False)
     return processed_data
 
 
-
-
 def data_split(raw_data, percent=None):
     '''
-    :param raw_data: ['studentId', 'problemId', 'skill', 'startTime', 'endTime', 'timeTaken', 'correct']
+    :param raw_data: ['user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'time_taken', 'correct']
     :param percent: Ratio of training data
     :return:
     '''
 
     raw_data = raw_data.sort_values(by=['start_time'])
-
+    print(raw_data.sort_values(by=['problem_id']))
 
     raw_data = np.array(raw_data)
-
-
 
     raw_stu_id = raw_data[:, 0]
     raw_exercise_id = raw_data[:, 1]
     raw_skill = raw_data[:, 2]
-
 
     stu_id = np.unique(raw_stu_id)
     exercise_id = np.unique(raw_exercise_id)
     skill_id = np.unique(raw_skill)
 
     exercise_dic = id_dic_construction(exercise_id)
-    skill_dic = id_dic_construction(skill_id)  # skill dictionary
+    skill_dic = skill_dic_construction(skill_id)  # skill dictionary
 
     # exercise & skill recoding to avoid out of bound
     for i in range(len(raw_data)):
@@ -178,15 +186,15 @@ def data_split(raw_data, percent=None):
     exercise_num = len(exercise_id)
     skill_num = len(skill_id)
     print("Student Number:", stu_num)
+    print(exercise_id)
     print("Exercise Number:", exercise_num)
     print("Skill Number:", skill_num)
 
     '''Initialization for q-matrix'''
-    q_matrix = np.zeros([exercise_num+1, skill_num])
+    q_matrix = np.zeros([exercise_num + 1, skill_num])
     for i in range(len(raw_data)):
-        q_matrix[int(raw_exercise_id[i]), int(raw_skill[i]-1)] = 1
+        q_matrix[int(raw_exercise_id[i]), int(raw_skill[i])] = 1
     q_matrix = torch.from_numpy(q_matrix)
-
 
     raw_kt_object = []
     for i in tqdm.tqdm(range(len(stu_id))):
@@ -211,7 +219,7 @@ def data_split(raw_data, percent=None):
         answer_time = np.around(answer_time)
 
         # Interval Time Computation
-        start_time = stu_object[:, 3]
+        start_time = np.copy(stu_object[:, 3])
         interval_time = np.zeros(len(start_time))
         interval_time[1:] = start_time[1:] - start_time[:-1]
 
@@ -221,10 +229,10 @@ def data_split(raw_data, percent=None):
 
         # problem_id, answer time, interval time, correct
         LPKT_cell = np.zeros([4, stu_object.shape[0]])
-        LPKT_cell[0] = stu_object[:, 1]
+        LPKT_cell[0] = np.copy(stu_object[:, 1])
         LPKT_cell[1] = answer_time
         LPKT_cell[2] = interval_time
-        LPKT_cell[3] = stu_object[:, -1]
+        LPKT_cell[3] = np.copy(stu_object[:, -1])
         LPKT_cell = LPKT_cell.astype('int64')
 
         raw_kt_object.append(LPKT_cell)
@@ -241,30 +249,17 @@ def data_split(raw_data, percent=None):
     answer_time_num = len(raw_answer_time)
     interval_time_num = len(raw_interval_time)
 
-
     answer_time_dic = id_dic_construction(raw_answer_time)
     interval_time_dic = id_dic_construction(raw_interval_time)
-
 
     for i in tqdm.tqdm(range(len(raw_kt_object))):
         for j in range(len(raw_kt_object[i][0])):
             raw_kt_object[i][1][j] = answer_time_dic[raw_kt_object[i][1][j]]
             raw_kt_object[i][2][j] = interval_time_dic[raw_kt_object[i][2][j]]
 
-
     '''Zero Padding'''
     kt_object = zero_padding(raw_kt_object, threshold=100)
     kt_object = np.array(kt_object)
-
-    # raw_answer_time = np.array([])
-    # raw_interval_time = np.array([])
-    # for i in tqdm.tqdm(range(len(raw_kt_object))):
-    #     raw_answer_time = np.concatenate((raw_answer_time, raw_kt_object[i][1]))
-    #     raw_interval_time = np.concatenate((raw_interval_time, raw_kt_object[i][2]))
-    #
-    # raw_answer_time = np.unique(raw_answer_time)
-    # raw_interval_time = np.unique(raw_interval_time)
-
 
     if percent is not None:
         # End for
