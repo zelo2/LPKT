@@ -1,5 +1,5 @@
 # started on 2022/3/30
-# finished on 2022/4/? @zelo2
+# finished on 2022/4/1 @zelo2
 
 import os
 import pandas as pd
@@ -98,7 +98,7 @@ def ednet_kt1_clean(question_path, data_path, threshold=1):
     stu_id = 0
 
     # ['timestamp', 'solving_id', 'question_id', 'user_answer', 'elapsed_time']
-    answer_dic = {'a': 1, 'b': 2, 'c': 3, 'd': 4}
+    # answer_dic = {'a': 1, 'b': 2, 'c': 3, 'd': 4}
     for stu_file_name in tqdm.tqdm(stu_file_list):
         stu_record = pd.read_csv(data_path + '\\' + stu_file_name, encoding="utf-8", low_memory=True).fillna(-2)
         stu_record = stu_record.drop_duplicates()
@@ -119,9 +119,9 @@ def ednet_kt1_clean(question_path, data_path, threshold=1):
             continue
 
         # [? * 7]('user_id', 'problem_id', 'skill', 'start_time', 'end_time', 'time_taken', 'correct')
+        temp_lpkt_cell = []
         for i in range(len(stu_record)):
 
-            temp_lpkt_cell = []
             ques_id = stu_record[i, 2]
             skill_index = np.where(ques_info[:, 0] == ques_id)[0][0]
 
@@ -142,6 +142,7 @@ def ednet_kt1_clean(question_path, data_path, threshold=1):
                                        correct])
 
         kt_data.append(torch.tensor(temp_lpkt_cell))
+        # print(torch.tensor(temp_lpkt_cell).size())
         stu_id += 1
     kt_data = torch.cat(kt_data).numpy()
     processed_data = pd.DataFrame(kt_data,
